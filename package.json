@@ -1,7 +1,8 @@
 {
   "dependencies": {
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
-    "firebase": "^11.3.1"
+    "firebase": "^11.3.1",
+    "firestore": "^1.1.6"
   },
   "devDependencies": {
     "webpack": "^5.98.0",

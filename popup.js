@@ -1,4 +1,4 @@
-import { auth } from "./firebase.js";
+import { auth, db } from "./firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 
@@ -8,7 +8,8 @@ const joinOrgDiv = document.getElementById('join-org');
 const signInOutButton = document.getElementById('sign-in-out');
 const signInUpDiv = document.getElementById('sign-in-up-form');
 
-function updateUIForSignedInUser(user) {
+async function updateUIForSignedInUser(user) {
+    console.log('updateUIForSignedInUser');
     // Change to "Sign Out" button
     signInOutButton.innerHTML = 'Sign Out';
 
@@ -29,6 +30,11 @@ function updateUIForSignedInUser(user) {
 }
 
 signInOutButton.addEventListener('click', (e) => {
+    signUp(e);
+});
+
+const signUp = async (e) => {
+    console.log('signUp');
     e.preventDefault();
     
     var logInEmailInput = document.getElementById('log-in-email');
@@ -105,8 +111,9 @@ signInOutButton.addEventListener('click', (e) => {
         signInUpDiv.appendChild(signUpButton);
 
         // Handle sign-up logic
-        signUpButton.addEventListener('click', (e) => {
-            e.preventDefault();
+        signUpButton.addEventListener('click', (e2) => {
+            console.log('signUpButton pressed');
+            e2.preventDefault();
 
             // Gather input values
             const firstName = firstNameInput.value.trim();
@@ -125,15 +132,20 @@ signInOutButton.addEventListener('click', (e) => {
                         name: `${firstName} ${lastName}`,
                         email: email,
                         phone: phone,
-                        pic: undefined,
                     };
-
-                    //setDoc(doc(db, "users", user.uid), userData);
-
-                    chrome.storage.local.set({ loggedInUser: userData }, () => {
-                        updateUIForSignedInUser(userData); 
-                        signInOutButton.disabled = false; 
+                    // Save user data to Firestore
+                    console.log('Saving user data to Firestore');
+                    setDoc(doc(db, "users", user.uid), userData)
+                    .then(() => {
+                        chrome.storage.local.set({ loggedInUser: userData }, () => {
+                            updateUIForSignedInUser(userData);
+                            signInOutButton.disabled = false;
+                        });
+                    })
+                    .catch((error) => {
+                        alert(`Error saving user data: ${error.message}`);
                     });
+                    alert('Sign-up successful!');
                 })
                 .catch((error) => {
                     alert(`Sign-up failed: ${error.message}`);
@@ -145,7 +157,7 @@ signInOutButton.addEventListener('click', (e) => {
     } else {
         signOut();
     }
-});
+}
 
 function updateUIForSignedOutUser() {
     // Change to "Sign In" button
