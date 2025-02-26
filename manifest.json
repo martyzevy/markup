@@ -1,6 +1,6 @@
 {
-    "name": "MarkUp",
-    "description": "MarkUp is a collaborative annotation tool for teams and classrooms. Highlight, comment, and discuss articles in real time.",
+    "name": "ThinkTank",
+    "description": "ThinkTank is a collaborative annotation tool for teams and classrooms. Highlight, comment, and discuss articles in real time.",
     "version": "1.0.0",
     "manifest_version": 3,
     "background": {
@@ -20,7 +20,8 @@
       {
         "matches": ["<all_urls>"],
         "js": ["contentScript.js"],
-        "css": ["contentScript.css"]
+        "css": ["contentScript.css"],
+        "type": "module"
       }
     ],
     "icons": {

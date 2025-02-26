@@ -1,3 +1,7 @@
+import { auth } from "./firebase.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+
 const joinButton = document.getElementById('join');
 const myOrgsDiv = document.getElementById('orgs');
 const joinOrgDiv = document.getElementById('join-org');
@@ -113,17 +117,26 @@ signInOutButton.addEventListener('click', (e) => {
 
             // Validate inputs
             if (firstName && lastName && email && password && phone) {
-                // Simulate sign-up logic (replace with actual API call)
-                const user = {
-                    name: `${firstName} ${lastName}`,
-                    email: email,
-                    phone: phone,
-                };
+                createUserWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    const userData = {
+                        uid: user.uid, 
+                        name: `${firstName} ${lastName}`,
+                        email: email,
+                        phone: phone,
+                        pic: undefined,
+                    };
 
-                // Save user data to storage (or send to backend)
-                chrome.storage.local.set({ loggedInUser: user }, () => {
-                    updateUIForSignedInUser(user); 
-                    signInOutButton.disabled = false; 
+                    //setDoc(doc(db, "users", user.uid), userData);
+
+                    chrome.storage.local.set({ loggedInUser: userData }, () => {
+                        updateUIForSignedInUser(userData); 
+                        signInOutButton.disabled = false; 
+                    });
+                })
+                .catch((error) => {
+                    alert(`Sign-up failed: ${error.message}`);
                 });
             } else {
                 alert('Please fill out all fields.');
