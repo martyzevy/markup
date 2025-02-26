@@ -34,7 +34,6 @@ signInOutButton.addEventListener('click', (e) => {
 });
 
 const signUp = async (e) => {
-    console.log('signUp');
     e.preventDefault();
     
     var logInEmailInput = document.getElementById('log-in-email');
@@ -124,32 +123,7 @@ const signUp = async (e) => {
 
             // Validate inputs
             if (firstName && lastName && email && password && phone) {
-                createUserWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    const user = userCredential.user;
-                    const userData = {
-                        uid: user.uid, 
-                        name: `${firstName} ${lastName}`,
-                        email: email,
-                        phone: phone,
-                    };
-                    // Save user data to Firestore
-                    console.log('Saving user data to Firestore');
-                    setDoc(doc(db, "users", user.uid), userData)
-                    .then(() => {
-                        chrome.storage.local.set({ loggedInUser: userData }, () => {
-                            updateUIForSignedInUser(userData);
-                            signInOutButton.disabled = false;
-                        });
-                    })
-                    .catch((error) => {
-                        alert(`Error saving user data: ${error.message}`);
-                    });
-                    alert('Sign-up successful!');
-                })
-                .catch((error) => {
-                    alert(`Sign-up failed: ${error.message}`);
-                });
+                await addUserToDb(firstName, lastName, email, phone, password);
             } else {
                 alert('Please fill out all fields.');
             }
@@ -158,6 +132,30 @@ const signUp = async (e) => {
         signOut();
     }
 }
+
+async function addUserToDb(firstName, lastName, email, phone, password) {
+    createUserWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            const userData = {
+                uid: user.uid, 
+                name: `${firstName} ${lastName}`,
+                email: email,
+                phone: phone,
+            };
+            chrome.storage.local.set({ loggedInUser: userData }, () => {
+                updateUIForSignedInUser(userData);
+                signInOutButton.disabled = false;
+            });
+            alert('Sign-up successful!');
+        })
+        .catch((error) => {
+            alert(`Sign-up failed: ${error.message}`);
+        });
+        await setDoc(doc(db, "users", user.uid), userData)
+}
+
+
 
 function updateUIForSignedOutUser() {
     // Change to "Sign In" button
