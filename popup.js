@@ -1,12 +1,59 @@
 import { auth, db } from "./firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 
 const joinButton = document.getElementById('join');
 const myOrgsDiv = document.getElementById('orgs');
 const joinOrgDiv = document.getElementById('join-org');
 const signInOutButton = document.getElementById('sign-in-out');
 const signInUpDiv = document.getElementById('sign-in-up-form');
+const profilePic = document.getElementById('profile-pic');
+
+profilePic.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            // Update the profile picture src
+            profilePic.src = event.target.result;
+
+            // Get the Firebase UID from Chrome storage
+            const result = await chrome.storage.local.get('loggedInUser');
+            const firebase_uid = result.loggedInUser.uid;
+
+            if (!firebase_uid) {
+                alert('User not logged in.');
+                return;
+            }
+
+            // Update Firestore
+            const docRef = doc(db, "users", firebase_uid);
+            try {
+                // Check if the document exists
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    // Update the user's profile picture in Firestore
+                    await updateDoc(docRef, {
+                        pic: event.target.result, // Save the base64-encoded image
+                    });
+                    console.log('Profile picture updated successfully.');
+                } else {
+                    alert('User not found.');
+                }
+            } catch (error) {
+                alert(`Error updating profile picture: ${error.message}`);
+            }
+        };
+
+        // Read the file as a Data URL
+        reader.readAsDataURL(file);
+    }
+});
 
 async function updateUIForSignedInUser(user) {
     console.log('updateUIForSignedInUser');
@@ -123,11 +170,54 @@ const signUp = async (e) => {
 
             // Validate inputs
             if (firstName && lastName && email && password && phone) {
-                await addUserToDb(firstName, lastName, email, phone, password);
+                signInUpDiv.innerHTML = '';
+                addUserToDb(firstName, lastName, email, phone, password);
             } else {
                 alert('Please fill out all fields.');
             }
         });
+
+        // Handle log-in logic
+        logInButton.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            const email = logInEmailInput.value.trim();
+            const password = logInPasswordInput.value.trim();
+
+            if (email && password) {
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        const user = userCredential.user;
+                        const firebase_uid = user.uid;
+                        // Get user data from Firestore
+                        const docRef = doc(db, "users", firebase_uid);
+                        getDoc(docRef)
+                            .then((docSnap) => {
+                                if (docSnap.exists()) {
+                                    const userData = docSnap.data();
+                                    chrome.storage.local.set({ loggedInUser: userData }, () => {
+                                        updateUIForSignedInUser(userData);
+                                    });
+                                    alert('Sign-in successful!');
+                                } else {
+                                    alert('User not found.');
+                                }
+                            })
+                            .catch((error) => {
+                                alert(`Error getting user data: ${error.message}`);
+                        signInUpDiv.innerHTML = '';
+                        alert('Sign-in successful!');
+                    })
+                    .catch((error) => {
+                        alert(`Sign-in failed: ${error.message}`);
+                    });
+                });
+            } else{
+                alert('Please fill out all fields.');
+            }
+        });
+
+
     } else {
         signOut();
     }
