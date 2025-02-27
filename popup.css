@@ -97,3 +97,21 @@ button{
     background-color: #007bff;
     color:white;
 }
+
+#orgs {
+    list-style-type: none;
+    padding: 0;
+}
+
+#orgs li {
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#orgs li:hover {
+    background-color: #e0e0e0;
+}
+

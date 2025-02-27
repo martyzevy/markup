@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 
 const joinButton = document.getElementById('join');
 const myOrgsDiv = document.getElementById('orgs');
@@ -74,6 +74,33 @@ async function updateUIForSignedInUser(user) {
     }
 
     // TODO: Display user's organizations
+    displayUserOrganizations(user);
+    joinButton.disabled = false;
+    joinButton.style.cursor = 'pointer';
+    joinButton.style.opacity = '1';
+    joinButton.innerHTML = 'Join an Organization';
+}
+
+function displayUserOrganizations(user) {
+    if (!user.organizations || user.organizations.length === 0) {
+        return;
+    }
+    const userOrgs = user.organizations;
+    for (const orgId of userOrgs) {
+        const orgRef = doc(db, "organizations", orgId);
+        getDoc(orgRef)
+            .then((orgSnap) => {
+                if (orgSnap.exists()) {
+                    const orgName = orgSnap.data().Name;
+                    const org = document.createElement('li');
+                    myOrgsDiv.appendChild(org);
+                    org.innerHTML = orgName;
+                } 
+            })
+            .catch((error) => {
+                alert(`Error getting organization data: ${error.message}`);
+        });
+    }
 }
 
 signInOutButton.addEventListener('click', (e) => {
@@ -261,6 +288,11 @@ function updateUIForSignedOutUser() {
     profilePic.src = 'icons/default-profile.png';
 
     // TODO: Clear user's organizations
+    myOrgsDiv.innerHTML = '';
+    joinButton.disabled = true;
+    joinButton.style.cursor = 'not-allowed';
+    joinButton.style.opacity = '0.6';
+    joinButton.innerHTML = 'Log in to Join an Organization';
 }
 
 function signOut() {
@@ -312,20 +344,60 @@ joinButton.addEventListener('click', (e) => {
     joinOrgDiv.appendChild(joinOrgButton);
 
     // Handle joining the organization
-    joinOrgButton.addEventListener('click', () => {
+    joinOrgButton.addEventListener('click', async (e) => {
+        e.preventDefault();
         const orgCode = orgCodeInput.value.trim();
-
-        if (orgCode) {
-            joinOrgButton.disabled = true;
-
-            // Simulate joining an organization (replace with your actual logic)
-            setTimeout(() => {
-                // Optionally, remove the input and button after joining
-                joinOrgDiv.removeChild(orgCodeInput);
-                joinOrgDiv.removeChild(joinOrgButton);
-            }, 1000); // Simulate a 1-second delay for joining
-        } else {
+    
+        if (!orgCode) {
             alert('Please enter an organization code.');
+            return;
+        }
+    
+        try {
+            // Get the logged-in user's UID from Chrome storage
+            const result = await chrome.storage.local.get('loggedInUser');
+            const userId = result.loggedInUser.uid;
+    
+            if (!userId) {
+                alert('User not logged in.');
+                return;
+            }
+    
+            // Look for the organization in Firestore
+            const orgRef = doc(db, "organizations", orgCode);
+            const orgSnap = await getDoc(orgRef);
+    
+            if (!orgSnap.exists()) {
+                alert('Organization not found.');
+                return;
+            }
+    
+            const orgId = orgSnap.id;
+    
+            // Add the organization to the user's list of organizations
+            const userRef = doc(db, "users", userId);
+            await updateDoc(userRef, {
+                organizations: arrayUnion(orgId), // Use arrayUnion to append to the array
+            });
+            console.log('Organization joined successfully.');
+    
+            // Add the user to the organization's list of users
+            const orgUsersRef = doc(db, "organizations", orgId);
+            await updateDoc(orgUsersRef, {
+                users: arrayUnion(userId), // Use arrayUnion to append to the array
+            });
+            console.log('User added to organization successfully.');
+            
+            // Update UI
+            const orgName = orgSnap.data().Name;
+            const org = document.createElement('li');
+            myOrgsDiv.appendChild(org);
+            org.innerHTML = orgName;
+            orgCodeInput.value = '';
+
+        } catch (error) {
+            console.error('Error:', error);
+            alert(`An error occurred: ${error.message}`);
         }
     });
 });
