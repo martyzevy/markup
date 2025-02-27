@@ -198,15 +198,15 @@ const signUp = async (e) => {
                                     chrome.storage.local.set({ loggedInUser: userData }, () => {
                                         updateUIForSignedInUser(userData);
                                     });
-                                    alert('Sign-in successful!');
+                                    signInUpDiv.innerHTML = '';
                                 } else {
                                     alert('User not found.');
                                 }
                             })
                             .catch((error) => {
                                 alert(`Error getting user data: ${error.message}`);
-                        signInUpDiv.innerHTML = '';
-                        alert('Sign-in successful!');
+                        
+                        
                     })
                     .catch((error) => {
                         alert(`Sign-in failed: ${error.message}`);
@@ -237,7 +237,6 @@ async function addUserToDb(firstName, lastName, email, phone, password) {
                 updateUIForSignedInUser(userData);
                 signInOutButton.disabled = false;
             });
-            alert('Sign-up successful!');
         })
         .catch((error) => {
             alert(`Sign-up failed: ${error.message}`);
