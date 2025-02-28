@@ -8,6 +8,7 @@ const joinOrgDiv = document.getElementById('join-org');
 const signInOutButton = document.getElementById('sign-in-out');
 const signInUpDiv = document.getElementById('sign-in-up-form');
 const profilePic = document.getElementById('profile-pic');
+var orgListItems = document.querySelectorAll('#orgs li');
 
 profilePic.addEventListener('dblclick', (e) => {
     e.preventDefault();
@@ -74,38 +75,88 @@ async function updateUIForSignedInUser(user) {
     }
 
     // TODO: Display user's organizations
-    displayUserOrganizations(user);
+    await displayUserOrganizations(user);
+    
+    // Now query for orgListItems after organizations are added
+    const orgListItems = document.querySelectorAll('#orgs li');
+    
     joinButton.disabled = false;
     joinButton.style.cursor = 'pointer';
     joinButton.style.opacity = '1';
     joinButton.innerHTML = 'Join an Organization';
+
+    // Check if Chrome storage has a selected organization and if so select it
+    const result = await chrome.storage.local.get('selectedOrg')
+        .then((result) => {
+            console.log('Selected org:', result.selectedOrg);
+            const selectedOrg = result.selectedOrg;
+            if (selectedOrg) {
+                console.log('orgListItems:', orgListItems);
+                orgListItems.forEach((org) => {
+                    if (org.dataset.orgId === selectedOrg) {
+                        console.log('Selecting org:', org.dataset.orgId);
+                        org.classList.add('selected');
+                    } else{
+                        console.log('Deselecting org:', org.dataset.orgId);
+                        org.classList.remove('selected');
+                    }
+                });
+            }
+        });
 }
 
-function displayUserOrganizations(user) {
+async function displayUserOrganizations(user) {
     if (!user.organizations || user.organizations.length === 0) {
         return;
     }
-    const userOrgs = user.organizations;
-    for (const orgId of userOrgs) {
+
+    myOrgsDiv.innerHTML = ''; // Clear existing organizations
+
+    for (const orgId of user.organizations) {
         const orgRef = doc(db, "organizations", orgId);
-        getDoc(orgRef)
-            .then((orgSnap) => {
-                if (orgSnap.exists()) {
-                    const orgName = orgSnap.data().Name;
-                    const org = document.createElement('li');
-                    myOrgsDiv.appendChild(org);
-                    org.innerHTML = orgName;
-                } 
-            })
-            .catch((error) => {
-                alert(`Error getting organization data: ${error.message}`);
-        });
+        try {
+            const orgSnap = await getDoc(orgRef);
+            if (orgSnap.exists()) {
+                const orgName = orgSnap.data().Name;
+                const org = document.createElement('li');
+                org.dataset.orgId = orgId; 
+                org.innerHTML = orgName;
+                myOrgsDiv.appendChild(org);
+            }
+        } catch (error) {
+            alert(`Error getting organization data: ${error.message}`);
+        }
     }
 }
+
 
 signInOutButton.addEventListener('click', (e) => {
     signUp(e);
 });
+
+// Event delegation for organization clicks
+myOrgsDiv.addEventListener('click', (e) => {
+    const org = e.target.closest('li'); 
+    if (org) {
+        e.preventDefault();
+        org.classList.toggle('selected');
+        
+        // Deselect all other organizations
+        const orgListItems = document.querySelectorAll('#orgs li');
+        orgListItems.forEach((otherOrg) => {
+            if (otherOrg !== org) {
+                otherOrg.classList.remove('selected');
+            }
+        });
+
+        const orgId = org.dataset.orgId;
+        // Save the selected organization to Chrome storage
+        chrome.storage.local.set({ selectedOrg: orgId }, () => {
+            console.log('Organization selected:', orgId);
+        });
+    }
+});
+
 
 const signUp = async (e) => {
     e.preventDefault();
@@ -250,6 +301,8 @@ const signUp = async (e) => {
     }
 }
 
+
+
 async function addUserToDb(firstName, lastName, email, phone, password) {
     createUserWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
@@ -322,7 +375,7 @@ joinButton.addEventListener('click', (e) => {
         joinOrgDiv.removeChild(orgCodeInput);
         joinOrgDiv.removeChild(joinOrgButton);
         return;
-    } 
+    }
 
     // Input for organization code
     orgCodeInput = document.createElement('input');
@@ -380,7 +433,7 @@ joinButton.addEventListener('click', (e) => {
                 organizations: arrayUnion(orgId), // Use arrayUnion to append to the array
             });
             console.log('Organization joined successfully.');
-    
+            
             // Add the user to the organization's list of users
             const orgUsersRef = doc(db, "organizations", orgId);
             await updateDoc(orgUsersRef, {
@@ -391,8 +444,9 @@ joinButton.addEventListener('click', (e) => {
             // Update UI
             const orgName = orgSnap.data().Name;
             const org = document.createElement('li');
-            myOrgsDiv.appendChild(org);
+            org.dataset.orgId = orgId; 
             org.innerHTML = orgName;
+            myOrgsDiv.appendChild(org);
             orgCodeInput.value = '';
 
         } catch (error) {

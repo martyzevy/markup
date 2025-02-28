@@ -109,9 +109,29 @@ button{
     background-color: #f0f0f0;
     border-radius: 5px;
     cursor: pointer;
+    position: relative;
+    padding-left: 30px;
 }
 
 #orgs li:hover {
     background-color: #e0e0e0;
+}
+
+#orgs li.selected{
+    background-color: #007bff;
+    color: white;
+}
+
+#orgs li.selected::before {
+    content: "\f00c"; 
+    font-family: "Font Awesome 5 Free"; 
+    font-weight: 900; 
+    font-size: 18px;
+    color: rgb(0, 246, 0);
+    margin-right: 10px;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
