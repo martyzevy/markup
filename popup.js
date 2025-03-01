@@ -101,6 +101,12 @@ async function updateUIForSignedInUser(user) {
                         org.classList.remove('selected');
                     }
                 });
+            } else if (orgListItems.length > 0) {
+                orgListItems[0].classList.add('selected');
+                // Save the selected organization to Chrome storage
+                chrome.storage.local.set({ selectedOrg: orgListItems[0].dataset.orgId }, () => {
+                    console.log('Organization selected:', orgListItems[0].dataset.orgId);
+                });
             }
         });
 }
@@ -111,6 +117,18 @@ async function displayUserOrganizations(user) {
     }
 
     myOrgsDiv.innerHTML = ''; // Clear existing organizations
+
+    // get updated user.organizations
+    await chrome.storage.local.get('loggedInUser', (result) => {
+        user = result.loggedInUser;
+    });
+
+    // Update user.organizations to include the new organization from firestore
+    const docRef = doc(db, "users", user.uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        user = docSnap.data();
+    }
 
     for (const orgId of user.organizations) {
         const orgRef = doc(db, "organizations", orgId);
@@ -136,8 +154,13 @@ signInOutButton.addEventListener('click', (e) => {
 
 // Event delegation for organization clicks
 myOrgsDiv.addEventListener('click', (e) => {
+    // updated orgListItems
+    orgListItems = document.querySelectorAll('#orgs li');
     const org = e.target.closest('li'); 
-    if (org) {
+    console.log('org clicked:', org);
+    console.log('orgListItems:', orgListItems.length);
+    if (org && orgListItems.length > 0) {
+        console.log('org clicked 2:', org);
         e.preventDefault();
         org.classList.toggle('selected');
         
@@ -150,10 +173,18 @@ myOrgsDiv.addEventListener('click', (e) => {
         });
 
         const orgId = org.dataset.orgId;
-        // Save the selected organization to Chrome storage
-        chrome.storage.local.set({ selectedOrg: orgId }, () => {
-            console.log('Organization selected:', orgId);
-        });
+        if (org.classList.contains('selected')) {
+            // Save the selected organization to Chrome storage
+            chrome.storage.local.set({ selectedOrg: orgId }, () => {
+                console.log('Organization selected:', orgId);
+            });
+        } else{
+            // Clear the selected organization from Chrome storage
+            chrome.storage.local.remove('selectedOrg', () => {
+                console.log('Organization deselected:', orgId);
+            });
+        }
+        
     }
 });
 
@@ -440,6 +471,11 @@ joinButton.addEventListener('click', (e) => {
                 users: arrayUnion(userId), // Use arrayUnion to append to the array
             });
             console.log('User added to organization successfully.');
+
+            // Save the selected organization to Chrome storage though User.organizations
+            // Get the user data from chrome storage
+            const user = result.loggedInUser;
+            user.organizations.push(orgId);
             
             // Update UI
             const orgName = orgSnap.data().Name;
