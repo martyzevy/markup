@@ -1,9 +1,30 @@
+import { db } from "./firebase.js";
+import { doc, getDoc, setDoc, arrayUnion } from "firebase/firestore";
+
 var annotate = false;
+var user = null;
+
+// Make window.onload async to await getUser
+window.onload = async function () {
+  console.log('Content script loaded');
+  user = await getUser(); // Await the user data
+  console.log('User after load:', user);
+
+  const currentUrl = window.location.href; // Get current website URL
+  await loadNotesForCurrentWebsite(currentUrl); // Load notes for the current website
+  createHighlighterButton(); // Create the button after user is set
+};
+
+async function getUser() {
+  const result = await chrome.storage.local.get('loggedInUser');
+  console.log('User from storage:', result.loggedInUser);
+  return result.loggedInUser; // Return the user directly
+}
 
 function createHighlighterButton() {
   const button = document.createElement('div');
   button.id = 'highlighter-button';
-  button.innerHTML = '🖍️'; 
+  button.innerHTML = '🖍️';
   button.style.position = 'fixed';
   button.style.top = '10px';
   button.style.right = '10px';
@@ -17,7 +38,7 @@ function createHighlighterButton() {
   button.style.justifyContent = 'center';
   button.style.cursor = 'pointer';
   button.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-  button.style.zIndex = '1000'; 
+  button.style.zIndex = '1000';
 
   document.body.appendChild(button);
   button.addEventListener('click', () => {
@@ -150,7 +171,156 @@ document.addEventListener('mouseup', () => {
         alert('Please enter a note.');
       }
     });
+
+    // Add a Submit Button
+    const submitButton = document.createElement('button');
+    submitButton.textContent = 'Submit';
+    submitButton.style.backgroundColor = '#007bff';
+    submitButton.style.color = 'white';
+    submitButton.style.border = 'none';
+    submitButton.style.padding = '8px 16px';
+    submitButton.style.cursor = 'pointer';
+    submitButton.style.borderRadius = '4px';
+    submitButton.style.fontSize = '14px';
+    submitButton.style.transition = 'background-color 0.3s ease';
+    submitButton.style.marginTop = '10px';
+
+    submitButton.addEventListener('mouseenter', () => {
+      submitButton.style.backgroundColor = '#0056b3';
+    });
+
+    submitButton.addEventListener('mouseleave', () => {
+      submitButton.style.backgroundColor = '#007bff';
+    });
+
+    noteContainer.appendChild(submitButton);
+
+    // Handle submit button
+    submitButton.addEventListener('click', async () => {
+      console.log('Submit button clicked');
+      console.log('User:', user);
+      const noteText = textarea.value.trim();
+      if (noteText) {
+        if (!user) {
+          console.error('User not found');
+          alert('User not logged in. Please log in and try again.');
+          return;
+        }
+
+        try {
+          // Get User's "selectedOrg" from Firestore
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const selectedOrg = data.selectedOrg;
+
+            // Get current website URL
+            const currentUrl = window.location.href;
+
+            // Encode the URL for Firestore
+            const encodedUrl = encodeUrlForFirestore(currentUrl);
+
+            // Create the note data
+            const noteData = {
+              text: noteText,
+              user: user.uid, // Store the user UID
+              date: new Date().toISOString(),
+              websiteUrl: currentUrl, // Save the current website URL
+              position: {
+                x: selectionX,
+                y: selectionY
+              }
+            };
+
+            // Save the note to Firestore under the appropriate website
+            const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
+            await setDoc(websiteRef, {
+              notes: arrayUnion(noteData)
+            }, {merge : true});
+
+            console.log('Note saved successfully');
+          } else {
+            console.error('User document does not exist');
+            alert('User document not found.');
+          }
+        } catch (error) {
+          console.error('Error saving note:', error);
+          alert('An error occurred while saving the note.');
+        }
+      } else {
+        alert('Please enter a note.');
+      }
+    });
   }
 });
 
-createHighlighterButton();
+// Helper function to encode URLs for Firestore document IDs
+function encodeUrlForFirestore(url) {
+  return url.replace(/\//g, '_'); // Replace all slashes with underscores
+}
+
+async function loadNotesForCurrentWebsite(url) {
+  console.log('Loading notes for website:', url);
+
+  try {
+    // Get User's "selectedOrg" from Firestore
+    const docRef = doc(db, "users", user.uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const selectedOrg = data.selectedOrg;
+
+      // Encode the URL for Firestore
+      const encodedUrl = encodeUrlForFirestore(url);
+
+      // Get the notes for the current website
+      const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
+      const websiteDoc = await getDoc(websiteRef);
+
+      if (websiteDoc.exists()) {
+        const websiteData = websiteDoc.data();
+        const notes = websiteData.notes || [];
+
+        // Render the notes on the page
+        notes.forEach(note => {
+          renderNote(note);
+        });
+      } else {
+        console.log('No notes found for this website');
+      }
+    } else {
+      console.error('User document does not exist');
+    }
+  } catch (error) {
+    console.error('Error loading notes:', error);
+    alert('An error occurred while loading the notes.');
+  }
+}
+
+function renderNote(note) {
+  const { text, position } = note;
+  const { x, y } = position;
+
+  // Create a note container
+  const noteContainer = document.createElement('div');
+  noteContainer.style.position = 'absolute';
+  noteContainer.style.top = `${y}px`;
+  noteContainer.style.left = `${x}px`;
+  noteContainer.style.backgroundColor = '#ffffff';
+  noteContainer.style.border = '1px solid #e0e0e0';
+  noteContainer.style.padding = '15px';
+  noteContainer.style.borderRadius = '8px';
+  noteContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+  noteContainer.style.zIndex = '1000';
+  noteContainer.style.width = '240px'; // Slightly wider for better spacing
+
+  // Create note content
+  const noteDisplay = document.createElement('div');
+  noteDisplay.textContent = text;
+  noteDisplay.style.fontSize = '14px';
+  noteDisplay.style.color = '#333';
+  noteContainer.appendChild(noteDisplay);
+
+  document.body.appendChild(noteContainer);
+}
