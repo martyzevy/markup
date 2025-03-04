@@ -318,13 +318,30 @@ async function loadNotesForCurrentWebsite(url) {
   }
 }
 
+async function getLikesData(note) {
+  // Get the updated likes count from Firestore by fetching the note
+  const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
+  const selectedOrg = firebase_user.selectedOrg;
+  const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
+  const websiteDoc = await getDoc(websiteRef);
+
+    if (websiteDoc.exists()) {
+      const websiteData = websiteDoc.data();
+      const notes = websiteData.notes || [];
+      console.log('notes array from Firestore:', notes);
+      return notes;
+  }
+}
+
 async function renderNote(note) {
   const { text, position } = note;
   const { x, y } = position;
 
+  var likesData = await getLikesData(note);
+
   const user = note.user;
   const date = new Date(note.date).toLocaleString();
-  var user_name = "Unknown User";
+  let user_name = "Unknown User";
 
   const docRef = doc(db, "users", user);
   const docSnap = await getDoc(docRef);
@@ -333,7 +350,6 @@ async function renderNote(note) {
     console.log('User data:', data);
     user_name = data.name;
   }
-
 
   // Create a note container
   const noteContainer = document.createElement('div');
@@ -355,13 +371,104 @@ async function renderNote(note) {
   noteDisplay.style.color = '#333';
   noteContainer.appendChild(noteDisplay);
 
-  // State user and date in in a smaller font on the bottom of the note
+  // State user and date in a smaller font on the bottom of the note
   const noteMeta = document.createElement('div');
   noteMeta.textContent = `By ${user_name} on ${date}`;
   noteMeta.style.fontSize = '12px';
   noteMeta.style.color = '#666';
   noteMeta.style.marginTop = '10px';
   noteContainer.appendChild(noteMeta);
+
+  // Add a section to display likes on the note
+  const likesSection = document.createElement('div');
+  likesSection.style.display = 'flex';
+  likesSection.style.alignItems = 'center';
+  likesSection.style.marginTop = '10px';
+
+  // Create a container for the like button and like count
+  const likeContainer = document.createElement('div');
+  likeContainer.style.display = 'flex';
+  likeContainer.style.alignItems = 'center';
+  likeContainer.style.backgroundColor = '#007bff'; // Blue background
+  likeContainer.style.borderRadius = '4px'; // Rounded corners
+  likeContainer.style.padding = '5px 10px'; // Padding for spacing
+  likeContainer.style.color = 'white'; // Text color for like count
+
+  // Add a like button
+  const likeButton = document.createElement('button');
+  likeButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
+  likeButton.style.backgroundColor = 'transparent'; // Transparent background
+  likeButton.style.color = 'white'; // White icon
+  likeButton.style.border = 'none';
+  likeButton.style.padding = '0';
+  likeButton.style.cursor = 'pointer';
+  likeButton.style.fontSize = '14px';
+  likeButton.style.transition = 'opacity 0.3s ease';
+  likeButton.style.marginRight = '5px'; // Space between button and count
+
+  // Add hover effect for the like button
+  likeButton.addEventListener('mouseenter', () => {
+    likeButton.style.opacity = '0.8';
+  });
+  likeButton.addEventListener('mouseleave', () => {
+    likeButton.style.opacity = '1';
+  });
+
+  // Add a like count
+  const likeCount = document.createElement('span');
+  if (!note.likes) {
+    note.likes = [];
+  }
+  likeCount.textContent = likesData.length; // Default to 0 if no likes
+  likeCount.style.fontSize = '14px';
+  likeCount.style.color = 'white'; // White text for like count
+
+  // Append the like button and like count to the container
+  likeContainer.appendChild(likeButton);
+  likeContainer.appendChild(likeCount);
+
+  // Append the like container to the likes section
+  likesSection.appendChild(likeContainer);
+
+  // Add a like button event listener
+  likeButton.addEventListener('click', async () => {
+    // Append the user ID to the note.likes array if it doesn't already exist
+    if (!likesData.includes(user.uid)) {
+      likesData.push(user.uid);
+    } else {
+      // Remove the user ID from the note.likes array
+      likesData = likesData.filter(e => e !== user.uid);
+    }
+
+    // Update the like count
+    likeCount.textContent = likesData.length;
+
+    // Update the note in Firestore
+    try {
+      const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
+      const selectedOrg = firebase_user.selectedOrg;
+      const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
+
+      console.log('note:', note);
+      if (likesData.length === 0 || likesData === undefined || likesData === null || likesData.includes(undefined)) { 
+        likesData = [];
+      }
+      note.likes = likesData;
+
+      // Update the note in Firestore
+      await updateDoc(websiteRef, {
+        notes: arrayUnion(note),
+      }, {merge : true});
+
+      console.log('Note updated successfully');
+    } catch (error) {
+      console.error('Error updating Firestore:', error);
+      alert('An error occurred while updating the note.');
+    }
+  });
+
+  // Append the likes section to the note container
+  noteContainer.appendChild(likesSection);
 
   // Append any replies to the note
   if (note.replies) {
@@ -532,3 +639,12 @@ async function handleReplyButton(noteContainer, note) {
   // Append the reply button to the note container
   noteContainer.appendChild(replyButton);
 }
+
+function injectStylesheet(url) {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = url;
+  document.head.appendChild(link);
+}
+
+injectStylesheet('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
