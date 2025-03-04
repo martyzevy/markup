@@ -154,6 +154,7 @@ document.addEventListener('mouseup', () => {
 
     // Handle reply submission
     replyButton.addEventListener('click', () => {
+      replyButton.disabled = true;
       const noteText = textarea.value.trim();
       if (noteText) {
         // Save the note (e.g., to Firebase or local storage)
@@ -170,6 +171,13 @@ document.addEventListener('mouseup', () => {
         noteDisplay.style.fontSize = '14px';
         noteDisplay.style.color = '#333';
         noteContainer.insertBefore(noteDisplay, textarea);
+
+        // Clean up the UI
+        noteContainer.removeChild(textarea);
+        noteContainer.removeChild(submitButton);
+
+        // Re-enable the reply button
+        replyButton.disabled = false;
 
         // Clear the textarea
         textarea.value = '';
@@ -355,12 +363,51 @@ async function renderNote(note) {
   noteMeta.style.marginTop = '10px';
   noteContainer.appendChild(noteMeta);
 
+  // Append any replies to the note
+  if (note.replies) {
+    note.replies.forEach(reply => {
+      renderReply(noteContainer, reply);
+    });
+  }
+
   await handleReplyButton(noteContainer, note);
   document.body.appendChild(noteContainer);
 }
 
+async function renderReply(noteContainer, reply) {
+  const replyDisplay = document.createElement('div');
+  replyDisplay.textContent = reply.text;
+  replyDisplay.style.backgroundColor = '#f9f9f9';
+  replyDisplay.style.border = '1px solid #e0e0e0';
+  replyDisplay.style.padding = '10px';
+  replyDisplay.style.borderRadius = '4px';
+  replyDisplay.style.marginTop = '10px';
+  replyDisplay.style.fontSize = '14px';
+  replyDisplay.style.color = '#333';
+
+  // say the user who replied and when
+  const reply_user_id = reply.user;
+  var reply_user = "";
+  const docRef = doc(db, "users", reply_user_id);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    console.log('User data:', data);
+    reply_user = data.name;
+  }
+  const reply_date = new Date(reply.date).toLocaleString();
+
+  const replyMeta = document.createElement('div');
+  replyMeta.textContent = `By ${reply_user} on ${reply_date}`;
+  replyMeta.style.fontSize = '12px';
+  replyMeta.style.color = '#666';
+  replyMeta.style.marginTop = '10px';
+  replyDisplay.appendChild(replyMeta);
+  noteContainer.appendChild(replyDisplay);
+}
+
 async function handleReplyButton(noteContainer, note) {
-  var replyButton = document.createElement('button');
+  const replyButton = document.createElement('button');
   replyButton.textContent = 'Reply';
   replyButton.style.backgroundColor = '#007bff';
   replyButton.style.color = 'white';
@@ -381,6 +428,9 @@ async function handleReplyButton(noteContainer, note) {
   });
 
   replyButton.addEventListener('click', () => {
+    // Disable the reply button to prevent multiple clicks
+    replyButton.disabled = true;
+
     // Create a textarea for the reply input
     const textarea = document.createElement('textarea');
     textarea.style.width = '100%';
@@ -389,17 +439,13 @@ async function handleReplyButton(noteContainer, note) {
     textarea.style.border = '1px solid #e0e0e0';
     textarea.style.borderRadius = '4px';
     textarea.style.padding = '8px';
+    textarea.style.marginTop = '10px';
     textarea.style.fontSize = '14px';
     textarea.style.resize = 'none';
     textarea.placeholder = 'Add your reply...';
     noteContainer.appendChild(textarea);
 
-    // the note object should have a "replies" array or if not create one
-    if (!note.replies) {
-      note.replies = [];
-    } 
-
-    // add a submit button
+    // Add a submit button
     const submitButton = document.createElement('button');
     submitButton.textContent = 'Submit';
     submitButton.style.backgroundColor = '#007bff';
@@ -413,55 +459,76 @@ async function handleReplyButton(noteContainer, note) {
     submitButton.style.marginTop = '10px';
     noteContainer.appendChild(submitButton);
 
-    submitButton.addEventListener('mouseenter', () => {
-      submitButton.style.backgroundColor = '#0056b3';
-    });
-
-    submitButton.addEventListener('mouseleave', () => {
-      submitButton.style.backgroundColor = '#007bff';
-    });
-
-    submitButton.addEventListener('click', async () => {
+    // Handle submit button click
+    const handleSubmit = async () => {
       const replyText = textarea.value.trim();
-      if (replyText) {
-        const newReply = {
-          text: replyText,
-          user: user.uid,
-          date: new Date().toISOString()
-        };
-
-        console.log('Reply:', newReply);
-    
-        // Update the note object locally
-        if (!note.replies) {
-          note.replies = [];
-        }
-        note.replies.push(newReply);
-    
-        // Update Firestore
-        try {
-          const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
-          const selectedOrg = firebase_user.selectedOrg;
-          console.log('Selected org:', selectedOrg);
-          console.log('user:', user);
-          console.log('Encoded URL:', encodedUrl);
-          const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
-    
-          // Use arrayUnion to add the new reply
-          await updateDoc(websiteRef, {
-            notes: arrayUnion(note)
-          });
-    
-          console.log('Reply added successfully');
-        } catch (error) {
-          console.error('Error updating Firestore:', error);
-          alert('An error occurred while saving the reply.');
-        }
-      } else {
+      if (!replyText) {
         alert('Please enter a reply.');
+        return;
       }
-    });
 
+      // Create the reply object
+      const newReply = {
+        text: replyText,
+        user: user.uid,
+        date: new Date().toISOString(),
+      };
+
+      // Update the note object locally
+      if (!note.replies) {
+        note.replies = [];
+      }
+      note.replies.push(newReply);
+
+      // Update Firestore
+      try {
+        const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
+        const selectedOrg = firebase_user.selectedOrg;
+        const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
+
+        // Use arrayUnion to add the new reply
+        await updateDoc(websiteRef, {
+          notes: arrayUnion(note),
+        });
+
+        console.log('Reply added successfully');
+      } catch (error) {
+        console.error('Error updating Firestore:', error);
+        alert('An error occurred while saving the reply.');
+      }
+
+      // Render the reply in the UI
+      const replyDisplay = document.createElement('div');
+      replyDisplay.textContent = replyText;
+      replyDisplay.style.backgroundColor = '#f9f9f9';
+      replyDisplay.style.border = '1px solid #e0e0e0';
+      replyDisplay.style.padding = '10px';
+      replyDisplay.style.borderRadius = '4px';
+      replyDisplay.style.marginTop = '10px';
+      replyDisplay.style.fontSize = '14px';
+      replyDisplay.style.color = '#333';
+
+      // Add metadata (user and date)
+      const replyMeta = document.createElement('div');
+      replyMeta.textContent = `By ${firebase_user.name} on ${new Date().toLocaleString()}`;
+      replyMeta.style.fontSize = '12px';
+      replyMeta.style.color = '#666';
+      replyMeta.style.marginTop = '10px';
+      replyDisplay.appendChild(replyMeta);
+      noteContainer.appendChild(replyDisplay);
+
+      // Clean up the UI
+      noteContainer.removeChild(textarea);
+      noteContainer.removeChild(submitButton);
+
+      // Re-enable the reply button
+      replyButton.disabled = false;
+    };
+
+    // Add event listener for the submit button
+    submitButton.addEventListener('click', handleSubmit);
   });
+
+  // Append the reply button to the note container
   noteContainer.appendChild(replyButton);
 }
