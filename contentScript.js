@@ -250,7 +250,8 @@ document.addEventListener('mouseup', () => {
               position: {
                 x: selectionX,
                 y: selectionY
-              }
+              },
+              likes: [],
             };
 
             // Save the note to Firestore under the appropriate website
@@ -324,11 +325,18 @@ async function getLikesData(note) {
   const selectedOrg = firebase_user.selectedOrg;
   const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
   const websiteDoc = await getDoc(websiteRef);
-
+  const noteText = note.text;
+  const notePisition = note.position;
     if (websiteDoc.exists()) {
       const websiteData = websiteDoc.data();
       const notes = websiteData.notes || [];
-      console.log('notes array from Firestore:', notes);
+      for (const n of notes) {
+        if (n.text === noteText && n.position.x === notePisition.x && n.position.y === notePisition.y) {
+          console.log('Note found:', n);
+          console.log('Likes:', n.likes);
+          return n.likes || [];
+        }
+      }
       return notes;
   }
 }
@@ -417,6 +425,7 @@ async function renderNote(note) {
   // Add a like count
   const likeCount = document.createElement('span');
   if (!note.likes) {
+    console.log('No likes found for note:', note);
     note.likes = [];
   }
   likeCount.textContent = likesData.length; // Default to 0 if no likes
@@ -433,11 +442,14 @@ async function renderNote(note) {
   // Add a like button event listener
   likeButton.addEventListener('click', async () => {
     // Append the user ID to the note.likes array if it doesn't already exist
-    if (!likesData.includes(user.uid)) {
-      likesData.push(user.uid);
+    console.log('like button clicked');
+    if (!likesData.includes(user)) {
+      likesData.push(user);
+      console.log('likesData after push:', likesData);
     } else {
       // Remove the user ID from the note.likes array
-      likesData = likesData.filter(e => e !== user.uid);
+      likesData = likesData.filter(e => e !== user);
+      console.log('likesData after filter:', likesData);
     }
 
     // Update the like count
@@ -448,19 +460,34 @@ async function renderNote(note) {
       const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
       const selectedOrg = firebase_user.selectedOrg;
       const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
-
-      console.log('note:', note);
-      if (likesData.length === 0 || likesData === undefined || likesData === null || likesData.includes(undefined)) { 
-        likesData = [];
+    
+      const websiteDoc = await getDoc(websiteRef);
+      if (websiteDoc.exists()) {
+        const websiteData = websiteDoc.data();
+        const notes = websiteData.notes || [];
+    
+        // Find the index of the note to update
+        const noteIndex = notes.findIndex(
+          (n) =>
+            n.text === note.text &&
+            n.position.x === note.position.x &&
+            n.position.y === note.position.y
+        );
+    
+        if (noteIndex !== -1) {
+          // Update the likes for the specific note
+          notes[noteIndex].likes = likesData;
+    
+          // Update the entire notes array in Firestore
+          await updateDoc(websiteRef, {
+            notes: notes,
+          });
+    
+          console.log('Note updated successfully');
+        } else {
+          console.log('Note not found');
+        }
       }
-      note.likes = likesData;
-
-      // Update the note in Firestore
-      await updateDoc(websiteRef, {
-        notes: arrayUnion(note),
-      }, {merge : true});
-
-      console.log('Note updated successfully');
     } catch (error) {
       console.error('Error updating Firestore:', error);
       alert('An error occurred while updating the note.');
@@ -587,13 +614,14 @@ async function handleReplyButton(noteContainer, note) {
       }
       note.replies.push(newReply);
 
+
       // Update Firestore
       try {
         const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
         const selectedOrg = firebase_user.selectedOrg;
         const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
 
-        // Use arrayUnion to add the new reply
+        // Use arrayUnion to add the new reply 
         await updateDoc(websiteRef, {
           notes: arrayUnion(note),
         });
