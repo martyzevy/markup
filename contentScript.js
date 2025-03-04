@@ -366,145 +366,131 @@ async function renderNote(note) {
   noteContainer.style.left = `${x}px`;
   noteContainer.style.backgroundColor = '#ffffff';
   noteContainer.style.border = '1px solid #e0e0e0';
-  noteContainer.style.padding = '15px';
   noteContainer.style.borderRadius = '8px';
   noteContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
   noteContainer.style.zIndex = '1000';
-  noteContainer.style.width = '240px'; // Slightly wider for better spacing
+  noteContainer.style.width = '240px'; 
+
+  // Create a collapsible header
+  const noteHeader = document.createElement('div');
+  noteHeader.className = 'note-header';
+  noteHeader.innerHTML = `
+    <h3>Note by ${user_name}</h3>
+    <span class="collapse-icon">▼</span>
+  `;
+  noteContainer.appendChild(noteHeader);
+
+  // Create note content container
+  const noteContent = document.createElement('div');
+  noteContent.className = 'note-content';
+  noteContainer.appendChild(noteContent);
 
   // Create note content
   const noteDisplay = document.createElement('div');
   noteDisplay.textContent = text;
   noteDisplay.style.fontSize = '14px';
   noteDisplay.style.color = '#333';
-  noteContainer.appendChild(noteDisplay);
+  noteContent.appendChild(noteDisplay);
 
   // State user and date in a smaller font on the bottom of the note
   const noteMeta = document.createElement('div');
-  noteMeta.textContent = `By ${user_name} on ${date}`;
+  noteMeta.textContent = `On ${date}`;
   noteMeta.style.fontSize = '12px';
   noteMeta.style.color = '#666';
   noteMeta.style.marginTop = '10px';
-  noteContainer.appendChild(noteMeta);
+  noteContent.appendChild(noteMeta);
 
   // Add a section to display likes on the note
   const likesSection = document.createElement('div');
   likesSection.style.display = 'flex';
   likesSection.style.alignItems = 'center';
   likesSection.style.marginTop = '10px';
+  noteContent.appendChild(likesSection);
 
-  // Create a container for the like button and like count
+  // Add a like button and like count
   const likeContainer = document.createElement('div');
   likeContainer.style.display = 'flex';
   likeContainer.style.alignItems = 'center';
-  likeContainer.style.backgroundColor = '#007bff'; // Blue background
-  likeContainer.style.borderRadius = '4px'; // Rounded corners
-  likeContainer.style.padding = '5px 10px'; // Padding for spacing
-  likeContainer.style.color = 'white'; // Text color for like count
+  likeContainer.style.backgroundColor = '#007bff';
+  likeContainer.style.borderRadius = '4px';
+  likeContainer.style.padding = '5px 10px';
+  likeContainer.style.color = 'white';
+  likesSection.appendChild(likeContainer);
 
-  // Add a like button
   const likeButton = document.createElement('button');
   likeButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
-  likeButton.style.backgroundColor = 'transparent'; // Transparent background
-  likeButton.style.color = 'white'; // White icon
+  likeButton.style.backgroundColor = 'transparent';
+  likeButton.style.color = 'white';
   likeButton.style.border = 'none';
   likeButton.style.padding = '0';
   likeButton.style.cursor = 'pointer';
   likeButton.style.fontSize = '14px';
   likeButton.style.transition = 'opacity 0.3s ease';
-  likeButton.style.marginRight = '5px'; // Space between button and count
-
-  // Add hover effect for the like button
-  likeButton.addEventListener('mouseenter', () => {
-    likeButton.style.opacity = '0.8';
-  });
-  likeButton.addEventListener('mouseleave', () => {
-    likeButton.style.opacity = '1';
-  });
-
-  // Add a like count
-  const likeCount = document.createElement('span');
-  if (!note.likes) {
-    console.log('No likes found for note:', note);
-    note.likes = [];
-  }
-  likeCount.textContent = likesData.length; // Default to 0 if no likes
-  likeCount.style.fontSize = '14px';
-  likeCount.style.color = 'white'; // White text for like count
-
-  // Append the like button and like count to the container
+  likeButton.style.marginRight = '5px';
   likeContainer.appendChild(likeButton);
-  likeContainer.appendChild(likeCount);
 
-  // Append the like container to the likes section
-  likesSection.appendChild(likeContainer);
+  const likeCount = document.createElement('span');
+  likeCount.textContent = likesData.length;
+  likeCount.style.fontSize = '14px';
+  likeCount.style.color = 'white';
+  likeContainer.appendChild(likeCount);
 
   // Add a like button event listener
   likeButton.addEventListener('click', async () => {
-    // Append the user ID to the note.likes array if it doesn't already exist
-    console.log('like button clicked');
     if (!likesData.includes(user)) {
       likesData.push(user);
-      console.log('likesData after push:', likesData);
     } else {
-      // Remove the user ID from the note.likes array
       likesData = likesData.filter(e => e !== user);
-      console.log('likesData after filter:', likesData);
     }
-
-    // Update the like count
     likeCount.textContent = likesData.length;
 
-    // Update the note in Firestore
+    // Update Firestore
     try {
       const encodedUrl = encodeUrlForFirestore(note.websiteUrl);
       const selectedOrg = firebase_user.selectedOrg;
       const websiteRef = doc(db, "organizations", selectedOrg, "websites", encodedUrl);
-    
       const websiteDoc = await getDoc(websiteRef);
       if (websiteDoc.exists()) {
         const websiteData = websiteDoc.data();
         const notes = websiteData.notes || [];
-    
-        // Find the index of the note to update
         const noteIndex = notes.findIndex(
           (n) =>
             n.text === note.text &&
             n.position.x === note.position.x &&
             n.position.y === note.position.y
         );
-    
         if (noteIndex !== -1) {
-          // Update the likes for the specific note
           notes[noteIndex].likes = likesData;
-    
-          // Update the entire notes array in Firestore
           await updateDoc(websiteRef, {
             notes: notes,
           });
-    
           console.log('Note updated successfully');
-        } else {
-          console.log('Note not found');
         }
       }
     } catch (error) {
       console.error('Error updating Firestore:', error);
-      alert('An error occurred while updating the note.');
     }
   });
-
-  // Append the likes section to the note container
-  noteContainer.appendChild(likesSection);
 
   // Append any replies to the note
   if (note.replies) {
     note.replies.forEach(reply => {
-      renderReply(noteContainer, reply);
+      renderReply(noteContent, reply);
     });
   }
 
-  await handleReplyButton(noteContainer, note);
+  // Handle reply button
+  await handleReplyButton(noteContent, note);
+
+  // Add collapsible functionality
+  noteHeader.addEventListener('click', () => {
+    if (noteContent.style.display === 'none') noteContent.style.display = 'block';
+    else noteContent.style.display = 'none';
+    const collapseIcon = noteHeader.querySelector('.collapse-icon');
+    collapseIcon.textContent = noteContent.style.display === 'none' ? '▶' : '▼';
+  });
+
+  // Append the note container to the body
   document.body.appendChild(noteContainer);
 }
 
@@ -676,3 +662,38 @@ function injectStylesheet(url) {
 }
 
 injectStylesheet('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
+function injectStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .note-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      padding: 10px;
+      background-color: #f1f1f1;
+      border-bottom: 1px solid #ddd;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .note-header h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .collapse-icon {
+      font-size: 12px;
+      transition: transform 0.3s ease;
+    }
+
+    .note-content {
+      padding: 10px;
+      transition: opacity 0.3s ease;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+injectStyles();
