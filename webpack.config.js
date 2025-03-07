@@ -7,7 +7,8 @@ module.exports = {
   },
   output: {
     filename: '[name].bundle.js', // Outputs popup.bundle.js and contentScript.bundle.js
-    path: path.resolve(__dirname), // Output directory
+    path: path.resolve(__dirname, 'dist'), // Output directory
   },
   mode: 'production', // Or 'development' for debugging
 };
+

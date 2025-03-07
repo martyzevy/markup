@@ -58,6 +58,7 @@ fileInput.addEventListener('change', (e) => {
 
 async function updateUIForSignedInUser(user) {
     console.log('updateUIForSignedInUser');
+    
     // Change to "Sign Out" button
     signInOutButton.innerHTML = 'Sign Out';
 
@@ -65,50 +66,46 @@ async function updateUIForSignedInUser(user) {
     settingsButton.style.display = 'block';
 
     // Display user's name and profile picture
-    var profileName = document.getElementById('profile-name');
+    const profileName = document.getElementById('profile-name');
     profileName.innerHTML = user.name;
-    var profilePic = document.getElementById('profile-pic');
-    if (user.pic !== undefined){
-        profilePic.src = user.pic;
-    } else{
-        profilePic.src = 'icons/default-profile.png';
-    }
+    const profilePic = document.getElementById('profile-pic');
+    profilePic.src = user.pic || 'icons/default-profile.png'; // Use default if user.pic is undefined
 
-    // TODO: Display user's organizations
+    console.log('displayUserOrganizations');
+    // Display user's organizations
     await displayUserOrganizations(user);
-    
+
     // Now query for orgListItems after organizations are added
     const orgListItems = document.querySelectorAll('#orgs li');
-    
+
     joinButton.disabled = false;
     joinButton.style.cursor = 'pointer';
     joinButton.style.opacity = '1';
     joinButton.innerHTML = 'Join an Organization';
 
     // Check if Chrome storage has a selected organization and if so select it
-    const result = await chrome.storage.local.get('selectedOrg')
-        .then((result) => {
-            console.log('Selected org:', result.selectedOrg);
-            const selectedOrg = result.selectedOrg;
-            if (selectedOrg) {
-                console.log('orgListItems:', orgListItems);
-                orgListItems.forEach((org) => {
-                    if (org.dataset.orgId === selectedOrg) {
-                        console.log('Selecting org:', org.dataset.orgId);
-                        org.classList.add('selected');
-                    } else{
-                        console.log('Deselecting org:', org.dataset.orgId);
-                        org.classList.remove('selected');
-                    }
-                });
-            } else if (orgListItems.length > 0) {
-                orgListItems[0].classList.add('selected');
-                // Save the selected organization to Chrome storage
-                chrome.storage.local.set({ selectedOrg: orgListItems[0].dataset.orgId }, () => {
-                    console.log('Organization selected:', orgListItems[0].dataset.orgId);
-                });
+    const result = await chrome.storage.local.get('selectedOrg');
+    const selectedOrg = result.selectedOrg;
+
+    if (selectedOrg) {
+        console.log('Selected org:', selectedOrg);
+        orgListItems.forEach((org) => {
+            if (org.dataset.orgId === selectedOrg) {
+                console.log('Selecting org:', org.dataset.orgId);
+                org.classList.add('selected');
+            } else {
+                console.log('Deselecting org:', org.dataset.orgId);
+                org.classList.remove('selected');
             }
         });
+    } else if (orgListItems.length > 0) {
+        orgListItems[0].classList.add('selected');
+        const firstOrgId = orgListItems[0].dataset.orgId;
+
+        // Save the selected organization to Chrome storage
+        await chrome.storage.local.set({ selectedOrg: firstOrgId });
+        console.log('Organization selected:', firstOrgId);
+    }
 }
 
 async function displayUserOrganizations(user) {
@@ -184,9 +181,36 @@ myOrgsDiv.addEventListener('click', (e) => {
                 console.log('Organization deselected:', orgId);
             });
         }
-        
+        updateSelectedOrg(orgId); 
     }
 });
+
+async function updateSelectedOrg(orgId) {
+    const result = await chrome.storage.local.get('loggedInUser');
+    const user = result.loggedInUser;
+
+    const docRef = doc(db, "users", user.uid);
+    await updateDoc(docRef, {
+        selectedOrg: orgId,
+    });
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'changeSelectedOrg',
+            data: { selectedOrg: 'testOrg' },
+          }, (response) => {
+            if (response && response.success) {
+              console.log('Content script function triggered successfully.');
+            } else {
+              console.error('Failed to trigger content script function.');
+            }
+          });
+        }
+      });
+
+    console.log('Selected organization updated successfully.');
+}
 
 
 const signUp = async (e) => {
@@ -386,6 +410,7 @@ function signOut() {
 }
 
 window.onload = function () {
+    console.log('window.onload');
     chrome.storage.local.get('loggedInUser', (result) => {
         if (result.loggedInUser) {
             updateUIForSignedInUser(result.loggedInUser);

@@ -823,3 +823,21 @@ function getFormattedDate() {
 
   return `${month}/${day}/${year} ${hours}:${minutes}`;
 }
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('Message received:', request);
+  if (request.action === 'changeSelectedOrg') {
+    console.log('changeSelectedOrg in contentScript.js');
+
+    window.location.reload();
+
+    // Send a response back to the popup
+    sendResponse({ success: true });
+
+    // Reload the page (if necessary)
+    // location.reload();
+
+    // Return true to indicate that sendResponse will be called asynchronously
+    return true;
+  }
+});
