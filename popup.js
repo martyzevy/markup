@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from "firebase/firestore";
 
 const joinButton = document.getElementById('join');
 const myOrgsDiv = document.getElementById('orgs');
@@ -11,6 +11,8 @@ const profilePic = document.getElementById('profile-pic');
 var orgListItems = document.querySelectorAll('#orgs li');
 const createOrgButton = document.getElementById('create');
 const creatOrgDiv = document.getElementById('create-org-form');
+const popupCard = document.getElementById('org-info');
+const closeBtn = document.getElementById('closeBtn');
 
 function styleCreateOrgForm() {
     creatOrgDiv.style.display = 'block';
@@ -34,15 +36,15 @@ function styleCreateOrgForm() {
     });
 
     // Style the file input specifically
-    const fileInput = creatOrgDiv.querySelector('input[type="file"]');
-    fileInput.style.marginBottom = '10px';
+    //const fileInput = creatOrgDiv.querySelector('input[type="file"]');
+    //fileInput.style.marginBottom = '10px';
 
-    // Style the label
+    /*Style the label
     const label = creatOrgDiv.querySelector('label');
     label.style.display = 'block';
     label.style.marginBottom = '5px';
     label.style.fontSize = '14px';
-    label.style.color = '#333';
+    label.style.color = '#333';*/
 
     // Style the create button
     const createButton = creatOrgDiv.querySelector('button');
@@ -69,10 +71,9 @@ function styleCreateOrgForm() {
         // Check if the input fields are filled out
         const orgName = document.getElementById('org-name').value.trim();
         const orgDesc = document.getElementById('org-desc').value.trim();
-        const orgCode = document.getElementById('org-code').value.trim();
-        const file = fileInput.files[0];
+        //const file = fileInput.files[0];
 
-        if (!orgName || !orgDesc || !orgCode || !file) {
+        if (!orgName || !orgDesc) {
             alert('Please fill out all fields.');
             return;
         }
@@ -88,14 +89,15 @@ function styleCreateOrgForm() {
         const orgData = {
             Name: orgName,
             Description: orgDesc,
-            Code: orgCode,
             users: orgUsers,
             notes: [],
             owner: userId,
         };
 
         // generate a random firebase id for the organization
-        const orgId = Math.random().toString(36).substring(7);
+        var orgId = Math.random().toString(36).substring(7);
+        // make the orgID all uppercase
+        orgId = orgId.toUpperCase();
 
         // Add the organization to Firestore
         const orgRef = doc(db, "organizations", orgId);
@@ -116,16 +118,20 @@ createOrgButton.addEventListener('click', (e) => {
         creatOrgDiv.style.display = 'none';
         return;
     } else {
+        const joinDiv = document.getElementById('join-org-form');
+        if (joinDiv.style.display != 'none') {
+            joinDiv.style.display = 'none';
+        }
         styleCreateOrgForm();
     }
 });
 
-profilePic.addEventListener('dblclick', (e) => {
+/*profilePic.addEventListener('dblclick', (e) => {
     e.preventDefault();
     fileInput.click();
-});
+});*/
 
-fileInput.addEventListener('change', (e) => {
+/*fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
@@ -164,7 +170,7 @@ fileInput.addEventListener('change', (e) => {
         // Read the file as a Data URL
         reader.readAsDataURL(file);
     }
-});
+});*/
 
 async function updateUIForSignedInUser(user) {
     console.log('updateUIForSignedInUser');
@@ -172,14 +178,14 @@ async function updateUIForSignedInUser(user) {
     // Change to "Sign Out" button
     signInOutButton.innerHTML = 'Sign Out';
 
-    const settingsButton = document.getElementById('profile-settings');
-    settingsButton.style.display = 'block';
+    //const settingsButton = document.getElementById('profile-settings');
+    //settingsButton.style.display = 'block';
 
     // Display user's name and profile picture
     const profileName = document.getElementById('profile-name');
     profileName.innerHTML = user.name;
-    const profilePic = document.getElementById('profile-pic');
-    profilePic.src = user.pic || 'icons/default-profile.png'; // Use default if user.pic is undefined
+    //const profilePic = document.getElementById('profile-pic');
+    //profilePic.src = user.pic || 'icons/default-profile.png'; // Use default if user.pic is undefined
 
     console.log('displayUserOrganizations');
     // Display user's organizations
@@ -257,6 +263,374 @@ async function displayUserOrganizations(user) {
 
 signInOutButton.addEventListener('click', (e) => {
     signUp(e);
+});
+
+function guestViewOrg(orgId, orgName, orgDescription, orgUsers, orgOwner) {
+    popupCard.style.display = 'flex';
+    popupCard.style.justifyContent = 'center';
+    popupCard.style.alignItems = 'center';
+    popupCard.style.position = 'fixed';
+    popupCard.style.top = '0';
+    popupCard.style.left = '0';
+    popupCard.style.width = '100%';
+    popupCard.style.height = '100%';
+    popupCard.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    popupCard.style.zIndex = '1000';
+
+    // popup content is the first child of the popupCard
+    const popupContent = popupCard.children[0];
+    popupContent.style.backgroundColor = '#fff';
+    popupContent.style.padding = '20px';
+    popupContent.style.borderRadius = '10px';
+    popupContent.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+    popupContent.style.maxWidth = '500px';
+    popupContent.style.width = '100%';
+    popupContent.style.overflowY = 'auto';
+    popupContent.style.maxHeight = '90vh';
+
+    // get the organization name from firestore
+    const orgRef = doc(db, "organizations", orgId);
+
+    // get the owner's name from firestore
+    const ownerRef = doc(db, "users", orgOwner);
+    var ownerName = '';
+    getDoc(ownerRef)
+        .then((ownerSnap) => {
+            if (ownerSnap.exists()) {
+                const ownerData = ownerSnap.data();
+                ownerName = ownerData.name;
+            } else {
+                alert('Owner not found.');
+            }
+        });
+
+    getDoc(orgRef)
+        .then((orgSnap) => {
+            if (orgSnap.exists()) {
+                const orgData = orgSnap.data();
+                const orgName = orgData.Name;
+                popupContent.innerHTML = `<h3 style="margin: 0 0 10px 0; font-size: 24px; color: #007bff;">${orgName}</h3>`;
+                popupContent.innerHTML += `<strong><h4 style="margin: 0 0 10px 0; font-size: 18px; color: black;">Join Code: ${orgId}</h4></strong>`;
+                popupContent.innerHTML += `<h4 style="margin: 0 0 10px 0; font-size: 18px; color: black;">Owner: ${ownerName}</h4>`;
+                const orgDescription = orgData.Description;
+                popupContent.innerHTML += `<p style="margin: 0 0 10px 0; font-size: 16px; color: black;">${orgDescription}</p>`;
+                const orgUsers = orgData.users;
+                const orgUsersList = document.createElement('ul');
+                orgUsersList.style.listStyleType = 'none';
+                orgUsersList.style.padding = '0';
+                orgUsersList.style.margin = '0';
+                orgUsersList.innerHTML = '<h4 style="margin: 0 0 10px 0; font-size: 18px; color: #007bff;">Members:</h4>';
+                // loop through the users in the organization and get their names
+                orgUsers.forEach((userId) => {
+                    const userRef = doc(db, "users", userId);
+                    getDoc(userRef)
+                        .then((userSnap) => {
+                            if (userSnap.exists()) {
+                                const userData = userSnap.data();
+                                const user = document.createElement('li');
+                                user.style.padding = '8px';
+                                user.style.borderBottom = '1px solid #eee';
+                                user.style.fontSize = '16px';
+                                user.style.color = 'black';
+                                user.innerHTML = userData.name;
+                                orgUsersList.appendChild(user);
+                            } else {
+                                alert('User not found.');
+                            }
+                        })
+                        .catch((error) => {
+                            alert(`Error getting user data: ${error.message}`);
+                        });
+                });
+
+
+                const leaveOrgButton = document.createElement('button');    
+                leaveOrgButton.innerHTML = 'Leave Organization';
+                leaveOrgButton.style.backgroundColor = '#dc3545';
+                leaveOrgButton.style.color = 'white';
+                leaveOrgButton.style.border = 'none';
+                leaveOrgButton.style.padding = '10px 20px';
+                leaveOrgButton.style.borderRadius = '5px';
+                leaveOrgButton.style.cursor = 'pointer';
+                leaveOrgButton.style.marginBottom = '10px';
+
+                leaveOrgButton.addEventListener('click', async () => {
+                    leaveOrg(orgId, userId);
+                });
+                popupContent.appendChild(leaveOrgButton);
+                popupContent.appendChild(orgUsersList);
+            } else {
+                alert('Organization not found.');
+            }
+        })
+        .catch((error) => {
+            alert(`Error getting organization data: ${error.message}`);
+        });
+}
+
+popupCard.addEventListener('click', function(event) {
+    if (event.target === popupCard) {
+      popupCard.style.display = 'none'; 
+    }
+});
+
+closeBtn.addEventListener('click', function() {
+    popupCard.style.display = 'none'; 
+});
+
+function leaveOrg(orgId, userId) {
+    if (confirm('Are you sure you want to leave this organization?')) {
+        const orgRef = doc(db, "organizations", orgId);
+        const userRef = doc(db, "users", userId);
+
+        // Remove user from organization's users array
+        updateDoc(orgRef, {
+            users: arrayRemove(userId)
+        }).then(() => {
+            // Remove organization from user's organizations array
+            updateDoc(userRef, {
+                organizations: arrayRemove(orgId)
+            }).then(() => {
+                alert('User removed successfully!');
+            }).catch((error) => {
+                alert(`Error updating user document: ${error.message}`);
+            });
+        }).catch((error) => {
+            alert(`Error updating organization document: ${error.message}`);
+        });
+    }
+}
+
+// Function to Remove a User from the Organization
+function removeUser(orgId, userId) {
+    console.log('Remove user:', userId, 'from organization:', orgId);
+    if (confirm('Are you sure you want to remove this user from the organization?')) {
+        const orgRef = doc(db, "organizations", orgId);
+        const userRef = doc(db, "users", userId);
+
+        // Remove user from organization's users array
+        updateDoc(orgRef, {
+            users: arrayRemove(userId)
+        }).then(() => {
+            // Remove organization from user's organizations array
+            updateDoc(userRef, {
+                organizations: arrayRemove(orgId)
+            }).then(() => {
+                alert('User removed successfully!');
+            }).catch((error) => {
+                alert(`Error updating user document: ${error.message}`);
+            });
+        }).catch((error) => {
+            alert(`Error updating organization document: ${error.message}`);
+        });
+    }
+}
+
+function ownerViewOrg(orgId, orgName, orgDescription, orgUsers, orgOwner) {
+    popupCard.style.display = 'flex';
+    popupCard.style.justifyContent = 'center';
+    popupCard.style.alignItems = 'center';
+    popupCard.style.position = 'fixed';
+    popupCard.style.top = '0';
+    popupCard.style.left = '0';
+    popupCard.style.width = '100%';
+    popupCard.style.height = '100%';
+    popupCard.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    popupCard.style.zIndex = '1000';
+
+    // popup content is the first child of the popupCard
+    const popupContent = popupCard.children[0];
+    popupContent.style.backgroundColor = '#fff';
+    popupContent.style.padding = '20px';
+    popupContent.style.borderRadius = '10px';
+    popupContent.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+    popupContent.style.maxWidth = '500px';
+    popupContent.style.width = '100%';
+    popupContent.style.overflowY = 'auto';
+    popupContent.style.maxHeight = '90vh';
+
+    // Clear existing content
+    popupContent.innerHTML = '';
+
+    // get the organization name from firestore
+    const orgRef = doc(db, "organizations", orgId);
+
+    // get the owner's name from firestore
+    const ownerRef = doc(db, "users", orgOwner);
+    var ownerName = '';
+    getDoc(ownerRef)
+        .then((ownerSnap) => {
+            if (ownerSnap.exists()) {
+                const ownerData = ownerSnap.data();
+                ownerName = ownerData.name;
+            } else {
+                alert('Owner not found.');
+            }
+        });
+
+    getDoc(orgRef)
+        .then((orgSnap) => {
+            if (orgSnap.exists()) {
+                const orgData = orgSnap.data();
+                const orgName = orgData.Name;
+                const orgDescription = orgData.Description;
+
+                // Editable Organization Name
+                popupContent.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px; color: #007bff;">
+                        <input id="orgNameInput" type="text" value="${orgName}" style="border: none; text-align: center; margin-left: 10px; margin-right: 10px; width: 90%; font-size: 24px; color: #007bff; background: transparent;">
+                    </h3>
+                `;
+
+                // Join Code and Owner
+                popupContent.innerHTML += `<strong><h4 style="margin: 0 0 10px 0; font-size: 18px; color: black;">Join Code: ${orgId}</h4></strong>`;
+                popupContent.innerHTML += `<h4 style="margin: 0 0 10px 0; font-size: 18px; color: black;">Owner: ${ownerName}</h4>`;
+
+                // Editable Organization Description
+                popupContent.innerHTML += `
+                    <p style="margin: 0 0 20px 0; font-size: 16px; color: black;">
+                        <textarea id="orgDescriptionInput" style="width: 90%; height: 100px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; font-size: 16px;">${orgDescription}</textarea>
+                    </p>
+                `;
+
+                // Save Changes Button
+                popupContent.innerHTML += `
+                    <button id="saveChangesBtn" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 20px;">
+                        Save Changes
+                    </button>
+                `;
+
+                // Users List
+                const orgUsersList = document.createElement('ul');
+                orgUsersList.style.listStyleType = 'none';
+                orgUsersList.style.padding = '0';
+                orgUsersList.style.margin = '0';
+                orgUsersList.innerHTML = '<h4 style="margin: 0 0 10px 0; font-size: 18px; color: #007bff;">Members:</h4>';
+
+                // Loop through the users in the organization and get their names
+                orgUsers.forEach((userId) => {
+                    const userRef = doc(db, "users", userId);
+                    getDoc(userRef)
+                        .then((userSnap) => {
+                            if (userSnap.exists()) {
+                                const userData = userSnap.data();
+                                const user = document.createElement('li');
+                                user.style.padding = '8px';
+                                user.style.borderBottom = '1px solid #eee';
+                                user.style.fontSize = '16px';
+                                user.style.color = 'black';
+                                user.style.display = 'flex';
+                                user.style.alignItems = 'center';
+                                user.style.justifyContent = 'space-between';
+
+                                // User Name
+                                user.innerHTML = userData.name;
+
+                                const removeUserBtn = document.createElement('i');
+                                removeUserBtn.className = 'fas fa-trash-alt';
+                                removeUserBtn.style.color = 'red';
+                                removeUserBtn.style.cursor = 'pointer';
+                                removeUserBtn.style.display = 'none';
+                                removeUserBtn.onclick = () => removeUser(orgId, userId);
+
+                                
+
+                                if (userId !== orgOwner) {
+                                    removeUserBtn.style.display = 'inline';
+                                } else{
+                                    const ownerInfo = document.createElement('i');
+                                    ownerInfo.style.color = 'red';
+                                    ownerInfo.innerHTML = 'Owner';
+                                    user.appendChild(ownerInfo);
+                                }
+                                user.appendChild(removeUserBtn);
+                                orgUsersList.appendChild(user);
+                            } else {
+                                alert('User not found.');
+                            }
+                        })
+                        .catch((error) => {
+                            alert(`Error getting user data: ${error.message}`);
+                        });
+                });
+
+                // Delete Organization Button
+                popupContent.innerHTML += `
+                    <button id="deleteOrgBtn" style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px;">
+                        Delete Organization
+                    </button>
+                `;
+
+                // Append the user list to the popup content
+                popupContent.appendChild(orgUsersList);
+
+                // Save Changes Event Listener
+                document.getElementById('saveChangesBtn').addEventListener('click', () => {
+                    const newName = document.getElementById('orgNameInput').value;
+                    const newDescription = document.getElementById('orgDescriptionInput').value;
+
+                    updateDoc(orgRef, {
+                        Name: newName,
+                        Description: newDescription
+                    }).then(() => {
+                        alert('Organization updated successfully!');
+                    }).catch((error) => {
+                        alert(`Error updating organization: ${error.message}`);
+                    });
+                });
+
+                // Delete Organization Event Listener
+                document.getElementById('deleteOrgBtn').addEventListener('click', () => {
+                    console.log('Delete organization:', orgId);
+                    if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+                        deleteDoc(orgRef)
+                            .then(() => {
+                                alert('Organization deleted successfully!');
+                                popupCard.style.display = 'none';
+                            })
+                            .catch((error) => {
+                                alert(`Error deleting organization: ${error.message}`);
+                            });
+                    }
+                });
+
+            } else {
+                alert('Organization not found.');
+            }
+        })
+        .catch((error) => {
+            alert(`Error getting organization data: ${error.message}`);
+        });
+}
+
+myOrgsDiv.addEventListener('dblclick', (e) => {
+    const org = e.target.closest('li');
+    // get the owner of the organization from firestore
+    const orgRef = doc(db, "organizations", org.dataset.orgId);
+    getDoc(orgRef)
+        .then((orgSnap) => {
+            if (orgSnap.exists()) {
+                const orgData = orgSnap.data();
+                const orgOwner = orgData.owner;
+                const orgUsers = orgData.users;
+                const orgName = orgData.Name;
+                const orgId = orgSnap.id;
+                const orgDescription = orgSnap.Description;
+                const result = chrome.storage.local.get('loggedInUser', (result) => {
+                    const user = result.loggedInUser;
+                    if (user.uid === orgOwner) {
+                        ownerViewOrg(orgId, orgName, orgDescription, orgUsers, orgOwner);
+                    } else {
+                        guestViewOrg(orgId, orgName, orgDescription, orgUsers, orgOwner);
+                    }
+                });
+            } else {
+                alert('Organization not found.');
+            }
+        })
+        .catch((error) => {
+            alert(`Error getting organization data: ${error.message}`);
+        });
 });
 
 // Event delegation for organization clicks
@@ -496,14 +870,14 @@ function updateUIForSignedOutUser() {
     signInOutButton.innerHTML = 'Log in / Sign Up';
 
     // Hide Settings Button
-    const settingsButton = document.getElementById('profile-settings');
-    settingsButton.style.display = 'none';
+    //const settingsButton = document.getElementById('profile-settings');
+    //settingsButton.style.display = 'none';
 
     // Clear user's name and profile picture
     const profileName = document.getElementById('profile-name');
     profileName.innerHTML = 'Guest';
-    const profilePic = document.getElementById('profile-pic');
-    profilePic.src = 'icons/default-profile.png';
+    //const profilePic = document.getElementById('profile-pic');
+    //profilePic.src = 'icons/default-profile.png';
 
     // TODO: Clear user's organizations
     myOrgsDiv.innerHTML = '';
@@ -532,17 +906,40 @@ window.onload = function () {
 
 joinButton.addEventListener('click', (e) => {
     e.preventDefault();
-    
-    // Check if the elements are already appended
-    var orgCodeInput = document.getElementById('org-code');
-    var joinOrgButton = document.getElementById('join-org-button');
-
-    if (orgCodeInput && joinOrgButton) {
-        joinOrgDiv.removeChild(orgCodeInput);
-        joinOrgDiv.removeChild(joinOrgButton);
+    var orgCodeInput;
+    const joinDiv = document.getElementById('join-org-form');
+    if (joinDiv.style.display === 'none') {
+        const createDiv = document.getElementById('create-org-form');
+        if (createDiv.style.display != 'none') {
+            createDiv.style.display = 'none';
+        }
+        const joinDiv = document.getElementById('join-org-form');
+        joinDiv.style.display = 'block';
+        orgCodeInput = document.getElementById('org-join-code');
+        orgCodeInput.style.border = '1px solid #007bff';
+        orgCodeInput.style.paddingLeft = '10px';
+        orgCodeInput.style.borderRadius = '15px';
+        orgCodeInput.style.marginRight = '10px';
+        orgCodeInput.style.width = '200px';
+        orgCodeInput.style.height = '30px';
+    } else{
+        joinDiv.style.display = 'none';
         return;
     }
+    var joinOrgButton = document.getElementById('join-org-button');
 
+    /*Check if the elements are already appended
+    var orgCodeInput = document.getElementById('org-code');
+    var joinOrgButton = document.getElementById('join-org-button');
+    const outerOuterDiv = document.getElementById('join-form');
+    const outerDiv = document.createElement('div');
+
+
+    if (orgCodeInput && joinOrgButton) {
+        outerOuterDiv.innerHTML = '';
+        return;
+    }
+    
     // Input for organization code
     orgCodeInput = document.createElement('input');
     orgCodeInput.setAttribute('type', 'text');
@@ -554,13 +951,14 @@ joinButton.addEventListener('click', (e) => {
     orgCodeInput.style.marginRight = '10px';
     orgCodeInput.style.width = '125px';
     orgCodeInput.style.height = '30px';
-    joinOrgDiv.appendChild(orgCodeInput);
+    outerDiv.appendChild(orgCodeInput);
 
     // Join button
     joinOrgButton = document.createElement('button');
     joinOrgButton.setAttribute('id', 'join-org-button');
     joinOrgButton.innerHTML = 'Join';
-    joinOrgDiv.appendChild(joinOrgButton);
+    outerDiv.appendChild(joinOrgButton);
+    outerOuterDiv.appendChild(outerDiv);*/
 
     // Handle joining the organization
     joinOrgButton.addEventListener('click', async (e) => {
