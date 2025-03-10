@@ -8,6 +8,8 @@ html, body {
     color: #333;
 }
 
+
+
 h1{
     justify-content: center;
     text-align: center;
@@ -22,6 +24,11 @@ button{
     background-color: white;
     color: #333;
     cursor: pointer;
+}
+
+#join-org{
+    display:flex;
+    gap: 10px;
 }
 
 #profile-section {
@@ -135,3 +142,8 @@ button{
     transform: translateY(-50%);
 }
 
+#join-create {
+    display: flex;
+    flex-direction: column; 
+    gap: 10px; 
+}

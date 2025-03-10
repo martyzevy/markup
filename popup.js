@@ -9,6 +9,116 @@ const signInOutButton = document.getElementById('sign-in-out');
 const signInUpDiv = document.getElementById('sign-in-up-form');
 const profilePic = document.getElementById('profile-pic');
 var orgListItems = document.querySelectorAll('#orgs li');
+const createOrgButton = document.getElementById('create');
+const creatOrgDiv = document.getElementById('create-org-form');
+
+function styleCreateOrgForm() {
+    creatOrgDiv.style.display = 'block';
+
+    // Apply consistent styling to the form container
+    creatOrgDiv.style.backgroundColor = '1px solid #ccc';
+    creatOrgDiv.style.border = '1px solid #007bff';
+    creatOrgDiv.style.borderRadius = '10px';
+    creatOrgDiv.style.padding = '10px';
+    creatOrgDiv.style.marginTop = '10px';
+
+    // Style the input fields
+    const inputs = creatOrgDiv.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.style.padding = '5px';
+        input.style.border = '1px solid #ccc';
+        input.style.borderRadius = '5px';
+        input.style.marginBottom = '10px';
+        input.style.width = '95%';
+        input.style.marginRight = '10px';
+    });
+
+    // Style the file input specifically
+    const fileInput = creatOrgDiv.querySelector('input[type="file"]');
+    fileInput.style.marginBottom = '10px';
+
+    // Style the label
+    const label = creatOrgDiv.querySelector('label');
+    label.style.display = 'block';
+    label.style.marginBottom = '5px';
+    label.style.fontSize = '14px';
+    label.style.color = '#333';
+
+    // Style the create button
+    const createButton = creatOrgDiv.querySelector('button');
+    createButton.style.padding = '5px 10px';
+    createButton.style.border = '1px solid #ccc';
+    createButton.style.borderRadius = '30px';
+    createButton.style.backgroundColor = '#007bff';
+    createButton.style.color = 'white';
+    createButton.style.cursor = 'pointer';
+    createButton.style.marginTop = '10px';
+    createButton.style.width = '100%';
+
+    // Add hover effect to the create button
+    createButton.addEventListener('mouseover', () => {
+        createButton.style.backgroundColor = '#0056b3';
+    });
+
+    createButton.addEventListener('mouseout', () => {
+        createButton.style.backgroundColor = '#007bff';
+    });
+
+    // Handle create button click
+    createButton.addEventListener('click', async (e) => {   
+        // Check if the input fields are filled out
+        const orgName = document.getElementById('org-name').value.trim();
+        const orgDesc = document.getElementById('org-desc').value.trim();
+        const orgCode = document.getElementById('org-code').value.trim();
+        const file = fileInput.files[0];
+
+        if (!orgName || !orgDesc || !orgCode || !file) {
+            alert('Please fill out all fields.');
+            return;
+        }
+
+        var orgUsers = [];
+        // Get the logged-in user's UID from Chrome storage
+        const result = await chrome.storage.local.get('loggedInUser');
+        const userId = result.loggedInUser.uid;
+        console.log('userId:', userId);
+        orgUsers.push(userId);
+
+        // Create a new organization in Firestore
+        const orgData = {
+            Name: orgName,
+            Description: orgDesc,
+            Code: orgCode,
+            users: orgUsers,
+            notes: [],
+            owner: userId,
+        };
+
+        // generate a random firebase id for the organization
+        const orgId = Math.random().toString(36).substring(7);
+
+        // Add the organization to Firestore
+        const orgRef = doc(db, "organizations", orgId);
+        await setDoc(orgRef, orgData);
+        // Add the organization to the user's list of organizations
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, {
+            organizations: arrayUnion(orgId), // Use arrayUnion to append to the array
+        });
+        console.log('User added to organization successfully.');
+        creatOrgDiv.style.display = 'none';
+        updateUIForSignedInUser(result.loggedInUser);
+    });
+}
+
+createOrgButton.addEventListener('click', (e) => {
+    if (creatOrgDiv.style.display != 'none') {
+        creatOrgDiv.style.display = 'none';
+        return;
+    } else {
+        styleCreateOrgForm();
+    }
+});
 
 profilePic.addEventListener('dblclick', (e) => {
     e.preventDefault();

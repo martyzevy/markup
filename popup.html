@@ -9,8 +9,20 @@
         <h1><img src="icons/thinktanklogo.jpg"></h1><hr />
         <h2><label for="orgs">Your Organizations</label></h2>
         <ul id="orgs"></ul>
-        <div id="join-org">
-            <h2><button id="join">Join an Organization</button></h2>
+        <div id="join-create">
+            <div id="join-org">
+                <h2><button id="join">Join an Organization</button></h2>
+                <h2><button id="create">Create an Organization</button></h2>
+            </div>
+            <div id="create-org-form" style="display: none;">
+                <h2>Create an Organization</h2>
+                <input type="text" id="org-name" placeholder="Organization Name">
+                <input type="text" id="org-desc" style="height: 40px;" placeholder="Organization Description">
+                <input type="text" id="org-code" placeholder="Organization Password">
+                <label for="org-pic">Upload Organization Picture</label>
+                <input type="file" id="org-pic" accept="image/*">          
+                <button id="create-org">Create</button>
+            </div>
         </div>
         <hr />
         <div id="profile-section">
