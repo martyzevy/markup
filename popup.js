@@ -195,6 +195,7 @@ async function updateUIForSignedInUser(user) {
     const orgListItems = document.querySelectorAll('#orgs li');
 
     joinButton.disabled = false;
+    document.getElementById('create').disabled = false;
     joinButton.style.cursor = 'pointer';
     joinButton.style.opacity = '1';
     joinButton.innerHTML = 'Join an Organization';
@@ -882,6 +883,7 @@ function updateUIForSignedOutUser() {
     // TODO: Clear user's organizations
     myOrgsDiv.innerHTML = '';
     joinButton.disabled = true;
+    document.getElementById('create').disabled = false;
     joinButton.style.cursor = 'not-allowed';
     joinButton.style.opacity = '0.6';
     joinButton.innerHTML = 'Log in to Join an Organization';

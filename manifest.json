@@ -6,8 +6,8 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "activeTab", "scripting", "identity", "nativeMessaging"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
