@@ -36,15 +36,15 @@ async function getUser() {
 function createHighlighterButton() {
   const button = document.createElement('div');
   button.id = 'highlighter-button';
-  button.innerHTML = '🖍️';
+  button.innerHTML = 'TT';
   button.style.position = 'fixed';
   button.style.top = '10px';
   button.style.right = '10px';
   button.style.width = '40px';
   button.style.height = '40px';
   button.style.borderRadius = '50%';
-  button.style.backgroundColor = '#007bff';
-  button.style.color = 'white';
+  button.style.backgroundColor = 'white';
+  button.style.color = '#007bff';
   button.style.display = 'flex';
   button.style.alignItems = 'center';
   button.style.justifyContent = 'center';
@@ -55,6 +55,13 @@ function createHighlighterButton() {
   document.body.appendChild(button);
   button.addEventListener('click', () => {
     annotate = !annotate;
+    if (annotate) {
+      button.style.backgroundColor = '#007bff';
+      button.style.color = 'white';
+    } else{
+      button.style.backgroundColor = 'white';
+      button.style.color = '#007bff';
+    }
     console.log('annotate', annotate);
   });
 }
