@@ -91,7 +91,7 @@ document.addEventListener('mouseup', () => {
     //line.style.transformOrigin = 'left';
     line.style.transform = 'scaleX(1)';
     line.style.transition = 'transform 0.3s ease';
-    document.body.appendChild(line);
+    //document.body.appendChild(line);
 
     // Create a note container on the right side of the screen
     const noteContainer = document.createElement('div');
@@ -99,103 +99,33 @@ document.addEventListener('mouseup', () => {
     noteContainer.style.top = `${noteY}px`;
     noteContainer.style.left = `${noteX}px`; 
     noteContainer.style.backgroundColor = '#ffffff';
-    noteContainer.style.border = '1px solid #e0e0e0';
+    noteContainer.style.border = '1px solid #007bff';
     noteContainer.style.borderRadius = '8px';
     noteContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
     noteContainer.style.zIndex = '1000';
     noteContainer.style.width = '240px'; // Slightly wider for better spacing
     noteContainer.style.fontFamily = 'Arial, sans-serif';
 
-    // Add an "X" button in the top-left corner
-    const closeButton = document.createElement('button');
-    closeButton.innerHTML = '×'; // "X" symbol
-    closeButton.style.position = 'absolute';
-    closeButton.style.top = '5px';
-    //closeButton.style.left = '5px';
-    closeButton.style.backgroundColor = 'transparent';
-    closeButton.style.border = 'none';
-    closeButton.style.fontSize = '16px';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.color = '#666';
-    closeButton.addEventListener('click', () => {
-      document.body.removeChild(noteContainer);
-      document.body.removeChild(line);
-    });
-    noteContainer.appendChild(closeButton);
-
     // Add a textarea for the note input
     const textarea = document.createElement('textarea');
     textarea.style.width = '100%';
-    textarea.style.height = '80px';
-    textarea.style.marginBottom = '10px';
-    textarea.style.marginTop = '10px';
+    textarea.style.height = '150px';
     textarea.style.border = '1px solid #e0e0e0';
     textarea.style.borderRadius = '4px';
     textarea.style.padding = '8px';
     textarea.style.fontSize = '14px';
     textarea.style.resize = 'none';
-    textarea.placeholder = 'Add your note...';
+    textarea.placeholder = 'Share your thoughts...';
     noteContainer.appendChild(textarea);
-
-    // Add a "Reply" button
-    const replyButton = document.createElement('button');
-    replyButton.textContent = 'Reply';
-    replyButton.style.backgroundColor = '#007bff';
-    replyButton.style.color = 'white';
-    replyButton.style.border = 'none';
-    replyButton.style.padding = '8px 16px';
-    replyButton.style.cursor = 'pointer';
-    replyButton.style.borderRadius = '4px';
-    replyButton.style.fontSize = '14px';
-    replyButton.style.transition = 'background-color 0.3s ease';
-    replyButton.addEventListener('mouseenter', () => {
-      replyButton.style.backgroundColor = '#0056b3';
-    });
-    replyButton.addEventListener('mouseleave', () => {
-      replyButton.style.backgroundColor = '#007bff';
-    });
-    noteContainer.appendChild(replyButton);
 
     // Add the note container to the page
     document.body.appendChild(noteContainer);
 
-    // Handle reply submission
-    replyButton.addEventListener('click', () => {
-      replyButton.disabled = true;
-      const noteText = textarea.value.trim();
-      if (noteText) {
-        // Save the note (e.g., to Firebase or local storage)
-        console.log('Note:', noteText);
-
-        // Display the note permanently
-        const noteDisplay = document.createElement('div');
-        noteDisplay.textContent = noteText;
-        noteDisplay.style.backgroundColor = '#f9f9f9';
-        noteDisplay.style.border = '1px solid #e0e0e0';
-        noteDisplay.style.padding = '10px';
-        noteDisplay.style.borderRadius = '4px';
-        noteDisplay.style.marginTop = '10px';
-        noteDisplay.style.fontSize = '14px';
-        noteDisplay.style.color = '#333';
-        noteContainer.insertBefore(noteDisplay, textarea);
-
-        // Clean up the UI
-        noteContainer.removeChild(textarea);
-        noteContainer.removeChild(submitButton);
-
-        // Re-enable the reply button
-        replyButton.disabled = false;
-
-        // Clear the textarea
-        textarea.value = '';
-
-        // Animate the line to fade out
-        line.style.transform = 'scaleX(0)';
-        setTimeout(() => {
-          document.body.removeChild(line);
-        }, 300);
-      } else {
-        alert('Please enter a note.');
+    // event listener for clicking outside the note container
+    document.addEventListener('click', (event) => {
+      const isClickInside = noteContainer.contains(event.target);
+      if (!isClickInside && !annotate) {
+        document.body.removeChild(noteContainer);
       }
     });
 
@@ -205,12 +135,13 @@ document.addEventListener('mouseup', () => {
     submitButton.style.backgroundColor = '#007bff';
     submitButton.style.color = 'white';
     submitButton.style.border = 'none';
-    submitButton.style.padding = '8px 16px';
+    submitButton.style.padding = '9px 17px';
     submitButton.style.cursor = 'pointer';
     submitButton.style.borderRadius = '4px';
-    submitButton.style.fontSize = '14px';
+    submitButton.style.fontSize = '15px';
     submitButton.style.transition = 'background-color 0.3s ease';
-    submitButton.style.marginTop = '10px';
+    submitButton.style.marginLeft = '80px';
+    submitButton.style.marginBottom = '2px';
 
     submitButton.addEventListener('mouseenter', () => {
       submitButton.style.backgroundColor = '#0056b3';
@@ -224,8 +155,6 @@ document.addEventListener('mouseup', () => {
 
     // Handle submit button
     submitButton.addEventListener('click', async () => {
-      console.log('Submit button clicked');
-      console.log('User:', user);
       const noteText = textarea.value.trim();
       if (noteText) {
         if (!user) {
@@ -273,7 +202,10 @@ document.addEventListener('mouseup', () => {
               notes: arrayUnion(noteData)
             }, {merge : true});
 
-            console.log('Note saved successfully');
+            // Render the note on the page
+            // delete the noteContainer
+            document.body.removeChild(noteContainer);
+            renderNote(noteData);
           } else {
             console.error('User document does not exist');
             alert('User document not found.');
