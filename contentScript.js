@@ -597,8 +597,8 @@ function injectStyles() {
       align-items: center;
       cursor: pointer;
       padding: 12px;
-      background-color: #f8f9fa;
-      border-bottom: 1px solid #e0e0e0;
+      background-color: white;
+      border-bottom: 1px solid white;
       border-radius: 8px 8px 0 0;
       width: auto;
     }
