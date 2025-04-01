@@ -10,7 +10,7 @@
     "extension_pages": "script-src 'self'; object-src 'none'"
   },
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": ["https://markup-f62af.firebaseio.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
